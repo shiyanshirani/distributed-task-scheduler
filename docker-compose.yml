@@ -1,0 +1,123 @@
+services:
+  dts-service:
+    build:
+      dockerfile: Dockerfile
+    container_name: dts-app
+    command:
+      - poetry
+      - run
+      - python3
+      - manage.py
+      - runserver
+      - '0.0.0.0:8000'
+    restart: unless-stopped
+    ports:
+      - '8000:8000'
+    env_file:
+      - ./services/.env
+    depends_on:
+      - db
+  db:
+    image: postgres
+    container_name: psql-db
+    env_file:
+      - ./services/.env.psql
+    volumes:
+      - 'postgres_data:/var/lib/postgresql/data'
+    restart: always
+  rabbitmq-service:
+    image: rabbitmq
+    container_name: rabbitmq-service
+    restart: always
+    env_file:
+      - ./services/.env.rabbitmq
+    ports:
+      - '5672:5672'
+      - '15672:15672'
+  worker-1:
+    build:
+      dockerfile: Dockerfile
+    container_name: celery-default-worker-1
+    command:
+      - poetry
+      - run
+      - celery
+      - '-A'
+      - distributed_task_scheduler
+      - worker
+      - '--loglevel=INFO'
+      - '-Q'
+      - default
+      - '-n'
+      - default-worker-1
+    depends_on:
+      - dts-service
+      - rabbitmq-service
+    env_file:
+      - ./services/.env
+  worker-2:
+    build:
+      dockerfile: Dockerfile
+    container_name: celery-default-worker-2
+    command:
+      - poetry
+      - run
+      - celery
+      - '-A'
+      - distributed_task_scheduler
+      - worker
+      - '--loglevel=INFO'
+      - '-Q'
+      - default
+      - '-n'
+      - default-worker-2
+    depends_on:
+      - dts-service
+      - rabbitmq-service
+    env_file:
+      - ./services/.env
+  worker-3:
+    build:
+      dockerfile: Dockerfile
+    container_name: celery-default-worker-3
+    command:
+      - poetry
+      - run
+      - celery
+      - '-A'
+      - distributed_task_scheduler
+      - worker
+      - '--loglevel=INFO'
+      - '-Q'
+      - default
+      - '-n'
+      - default-worker-3
+    depends_on:
+      - dts-service
+      - rabbitmq-service
+    env_file:
+      - ./services/.env
+  flower-service:
+    build:
+      dockerfile: Dockerfile
+    container_name: flower-service
+    command:
+      - poetry
+      - run
+      - celery
+      - '-A'
+      - distributed_task_scheduler
+      - flower
+    depends_on:
+      - dts-service
+      - rabbitmq-service
+      - worker-1
+    env_file:
+      - ./services/.env
+    ports:
+      - "5555:5555"
+
+# celery -A distributed_task_scheduler worker --loglevel=INFO -Q default -n "default-1-worker"
+
+volumes:
+  postgres_data:
